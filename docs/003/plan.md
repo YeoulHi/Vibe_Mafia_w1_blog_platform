@@ -34,13 +34,18 @@ flowchart TD
     I -- "advertiser_profiles" --> J[(Database)];
 ```
 
-## 3. Implementation Plan
+## 3. 선행 조건 및 의존성 (Pre-requisites & Dependencies)
+
+- **Database Schema**: `supabase/migrations`에 `advertiser_profiles` 테이블이 정의되어 있어야 합니다. 이 테이블은 `user_id`와 `business_number`에 대한 `UNIQUE` 제약조건을 반드시 포함해야 합니다.
+- **Authentication Context**: Hono의 `AppContext` (`c.var`) 내에, 인증된 사용자의 정보(최소 `id`와 `role` 포함)가 `user` 객체로 주입되고 있어야 합니다. 이 컨텍스트가 없다면 역할 기반 접근 제어를 구현할 수 없습니다.
+
+## 4. Implementation Plan
 
 ### 1. Backend (`src/features/advertiser/backend`)
 
 - **`schema.ts`**: `company_name`, `business_number` 등 `advertiser_profiles` 테이블에 명시된 모든 필드들에 대한 Zod 스키마를 정의합니다.
 - **`service.ts`**: `updateAdvertiserProfile` 서비스를 구현합니다. 인증된 사용자의 `user_id`를 사용하여 `advertiser_profiles` 테이블에 데이터를 `upsert` 합니다.
-- **`route.ts`**: `registerAdvertiserRoutes`를 생성하고 `POST /api/advertiser/profile` 라우트를 정의합니다. 인증된 광고주 사용자만 접근 가능하도록 미들웨어에서 확인해야 합니다.
+- **`route.ts`**: `registerAdvertiserRoutes`를 생성하고 `POST /api/advertiser/profile` 라우트를 정의합니다. 인증된 광고주 사용자만 접근 가능하도록 **라우트 핸들러 내에서** 역할을 직접 확인합니다. (예: `if (c.var.user?.role !== 'advertiser')`). 이는 복잡한 공통 미들웨어 수정 없이, 해당 기능 내에서 독립적으로 접근 제어를 구현하여 **복잡도를 낮추기 위함**입니다.
 - **`src/backend/hono/app.ts`**: `registerAdvertiserRoutes`를 호출하도록 수정합니다.
 
 #### Unit Tests (Business Logic)
@@ -53,7 +58,7 @@ flowchart TD
 ### 2. Frontend
 
 - **`AdvertiserOnboardingForm.tsx`**: `react-hook-form`과 `zodResolver`를 사용하여 업체 정보 입력 폼을 구현합니다. `shadcn-ui` 컴포넌트를 활용합니다.
-- **`useUpdateAdvertiserProfile.ts`**: 프로필 정보를 받아 `/api/advertiser/profile`로 POST 요청을 보내는 `useMutation` 훅을 생성합니다. 성공 시 광고주 대시보드로 이동합니다.
+- **`useUpdateAdvertiserProfile.ts`**: 프로필 정보를 받아 `/api/advertiser/profile`로 POST 요청을 보내는 `useMutation` 훅을 생성합니다. 성공 시 광고주 대시보드(예: `/dashboard`)로 이동합니다. **만약 대시보드 경로가 아직 미확정 상태일 경우, 이 작업의 병목 현상을 막기 위해 임시로 메인 페이지(`/`)로 리디렉션하도록 우선순위를 조정합니다.**
 - **`page.tsx`**: 신규 경로 `src/app/(protected)/onboarding/advertiser/page.tsx`를 생성하고, `AdvertiserOnboardingForm`을 렌더링합니다.
 
 #### QA Sheet (Presentation)

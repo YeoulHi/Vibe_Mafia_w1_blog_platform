@@ -195,6 +195,246 @@ use following libraries for specific functionalities:
 - 코드를 생성한 후에 utf-8 기준으로 깨지는 한글이 있는지 확인해주세요. 만약 있다면 수정해주세요.
 - 항상 한국어로 응답하세요.
 
+---
+
+## React Query Best Practices
+
+### Query 정의
+
+**Must**:
+- `enabled` 옵션으로 조건부 실행
+- `placeholderData`로 기본값 제공 (undefined 방지)
+- `retry: false`로 불필요한 재시도 방지 (필요시에만 사용)
+- 적절한 `staleTime` 설정 (예: 5분)
+
+```typescript
+// ✅ 올바른 패턴
+const defaultValue: SomeData = {
+  // 기본값 정의
+};
+
+export const useSomeQuery = () => {
+  const { isAuthenticated } = useCurrentUser();
+
+  return useQuery<SomeData>({
+    queryKey: ["some", "data"],
+    queryFn: async () => {
+      const response = await apiClient.get<SomeData>("/some/route");
+      return response.data ?? defaultValue; // null-safe
+    },
+    enabled: isAuthenticated, // 조건부 실행
+    retry: false,
+    staleTime: 1000 * 60 * 5, // 5분
+    placeholderData: defaultValue, // undefined 방지
+  });
+};
+```
+
+### Mutation 정의
+
+**Must**:
+- `onSuccess`에서 toast + 페이지 이동
+- `onError`에서 `extractApiErrorMessage` 사용
+- `isPending`으로 로딩 상태 관리
+
+```typescript
+// ✅ 올바른 패턴
+export const useSomeMutation = () => {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: SomeRequest) => {
+      const response = await apiClient.post("/some/route", data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "성공",
+        description: "작업이 성공적으로 완료되었습니다.",
+      });
+      router.push("/success-page");
+    },
+    onError: (error) => {
+      const message = extractApiErrorMessage(
+        error,
+        "작업에 실패했습니다."
+      );
+      toast({
+        title: "오류",
+        description: message,
+        variant: "destructive",
+      });
+    },
+  });
+};
+```
+
+---
+
+## Dynamic Form with useFieldArray
+
+### 스키마 정의
+
+**Must**:
+- 배열 필드는 명확한 Zod 스키마 정의
+- `min(0)` 사용 (빈 배열 허용)
+
+```typescript
+// ✅ 올바른 패턴
+const itemSchema = z.object({
+  name: z.string().min(1, '이름을 입력해주세요'),
+  value: z.number().min(0),
+});
+
+const formSchema = z.object({
+  items: z.array(itemSchema).min(0), // 0개 허용
+});
+```
+
+### useFieldArray 사용
+
+**Must**:
+- `control: form.control` 필수
+- `append()`로 기본값과 함께 추가
+- `remove(index)`로 삭제
+- `fields.map()`으로 렌더링 시 `field.id`를 key로 사용
+
+```typescript
+// ✅ 올바른 패턴
+import { useFieldArray } from "react-hook-form";
+
+const form = useForm<FormValues>({
+  resolver: zodResolver(formSchema),
+  mode: "onChange",
+  defaultValues: {
+    items: [],
+  },
+});
+
+const { fields, append, remove } = useFieldArray({
+  control: form.control,
+  name: "items",
+});
+
+// 아이템 추가
+const addItem = () => {
+  append({
+    name: "",
+    value: 0,
+  });
+};
+
+// 렌더링
+{fields.map((field, index) => (
+  <div key={field.id}> {/* ⚠️ field.id를 key로 사용 */}
+    <FormField
+      control={form.control}
+      name={`items.${index}.name`}
+      render={({ field }) => (
+        <FormItem>
+          <FormControl>
+            <Input {...field} />
+          </FormControl>
+        </FormItem>
+      )}
+    />
+    <Button type="button" onClick={() => remove(index)}>
+      삭제
+    </Button>
+  </div>
+))}
+```
+
+---
+
+## Auto Redirect Patterns
+
+### 로그인 후 리다이렉트
+
+**Must**:
+- 사용자 상태 확인 API 호출
+- 조건에 따른 자동 이동
+- 실패 시 기본 동작 수행
+
+```typescript
+// ✅ 올바른 패턴
+if (loginSuccess) {
+  await refresh();
+
+  try {
+    const status = await apiClient.get("/profile/status");
+
+    if (status.data.needsAction) {
+      router.replace("/required-action-page");
+      return;
+    }
+  } catch (error) {
+    // 실패 시 기본 동작 수행
+    console.error("Failed to check status:", error);
+  }
+
+  const redirectedFrom = searchParams.get("redirectedFrom") ?? "/dashboard";
+  router.replace(redirectedFrom);
+}
+```
+
+### 조건부 UI 표시
+
+**Must**:
+- Query 결과에 따른 조건부 렌더링
+- `isLoading` 상태 고려
+
+```typescript
+// ✅ 올바른 패턴
+export default function SomePage() {
+  const { data: status, isLoading } = useProfileStatus();
+
+  if (isLoading) {
+    return <Spinner />;
+  }
+
+  return (
+    <div>
+      {status?.needsAction && (
+        <Button asChild>
+          <Link href="/action-page">액션 필요</Link>
+        </Button>
+      )}
+    </div>
+  );
+}
+```
+
+### 페이지 레벨 리다이렉트
+
+**Must**:
+- `useEffect`로 조건 확인
+- `router.replace()` 사용 (뒤로가기 방지)
+- 리다이렉트 중 null 반환
+
+```typescript
+// ✅ 올바른 패턴
+export default function ProtectedPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useCurrentUser();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login?redirectedFrom=/protected-page");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading || !isAuthenticated) {
+    return null; // 또는 로딩 스피너
+  }
+
+  return <div>보호된 컨텐츠</div>;
+}
+```
+
+---
+
 You are a senior full-stack developer, one of those rare 10x devs. Your focus: clean, maintainable, high-quality code.
 Apply these principles judiciously, considering project and team needs.
 

@@ -1,8 +1,14 @@
-import axios, { isAxiosError } from "axios";
+﻿import axios, { isAxiosError } from "axios";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
+const apiBaseURL =
+  process.env.NEXT_PUBLIC_API_BASE_URL &&
+  process.env.NEXT_PUBLIC_API_BASE_URL.length > 0
+    ? process.env.NEXT_PUBLIC_API_BASE_URL
+    : "/api";
+
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "",
+  baseURL: apiBaseURL,
   headers: {
     "Content-Type": "application/json",
   },

@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+﻿import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/constants/env";
@@ -12,9 +12,38 @@ type WritableCookieStore = Awaited<ReturnType<typeof cookies>> & {
     expires?: Date;
     maxAge?: number;
     httpOnly?: boolean;
-    sameSite?: "lax" | "strict" | "none";
+    sameSite?: "lax" | "strict" | "none" | boolean;
     secure?: boolean;
   }) => void;
+};
+
+type SupabaseCookie = {
+  name: string;
+  value: string;
+  options?: {
+    path?: string;
+    expires?: Date;
+    maxAge?: number;
+    httpOnly?: boolean;
+    sameSite?: "lax" | "strict" | "none" | boolean;
+    secure?: boolean;
+  };
+};
+
+const safelySetCookie = (
+  cookieStore: WritableCookieStore,
+  cookie: SupabaseCookie,
+) => {
+  if (typeof cookieStore.set !== "function") {
+    return;
+  }
+
+  try {
+    cookieStore.set({ name: cookie.name, value: cookie.value, ...cookie.options });
+  } catch {
+    // Next.js 15 이상에서는 Route Handler나 Server Action 외부에서 cookie write가 제한된다.
+    // 해당 상황에서는 Supabase 세션 동기화를 건너뛰고, 이후 처리 흐름은 기존 쿠키를 사용한다.
+  }
 };
 
 export const createSupabaseServerClient = async (): Promise<
@@ -31,13 +60,9 @@ export const createSupabaseServerClient = async (): Promise<
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            if (typeof cookieStore.set === "function") {
-              cookieStore.set({ name, value, ...options });
-            }
-          });
+          cookiesToSet.forEach((cookie) => safelySetCookie(cookieStore, cookie));
         },
       },
-    }
+    },
   );
 };

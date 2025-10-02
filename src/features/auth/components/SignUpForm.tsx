@@ -40,7 +40,7 @@ const clientSignUpSchema = z
     phone: z.string().regex(/^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/, {
       message: "유효한 휴대폰 번호를 입력해주세요. (예: 010-1234-5678)",
     }),
-    birthdate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
+    birthdate: z.string().min(1, { message: "생년월일을 입력해주세요." }).regex(/^\d{4}-\d{2}-\d{2}$/, {
       message: "생년월일은 YYYY-MM-DD 형식이어야 합니다.",
     }),
     role: z.enum(["advertiser", "influencer"], {
@@ -62,7 +62,7 @@ export const SignUpForm = () => {
 
   const form = useForm<ClientSignUpForm>({
     resolver: zodResolver(clientSignUpSchema),
-    mode: "onChange",
+    mode: "onBlur", // onChange에서 onBlur로 변경
     defaultValues: {
       email: "",
       password: "",
@@ -90,6 +90,10 @@ export const SignUpForm = () => {
 
   const isFormValid = form.formState.isValid;
   const termsAccepted = form.watch("termsAccepted");
+  
+  // 🔍 디버깅을 위한 상태 확인
+  const formValues = form.watch();
+  const formErrors = form.formState.errors;
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -100,6 +104,23 @@ export const SignUpForm = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* 🔍 디버깅 정보 표시 */}
+        <div className="mb-4 p-4 bg-gray-100 rounded text-sm">
+          <h4 className="font-bold mb-2">디버깅 정보:</h4>
+          <p>isFormValid: {isFormValid ? '✅' : '❌'}</p>
+          <p>termsAccepted: {termsAccepted ? '✅' : '❌'}</p>
+          <p>isPending: {isPending ? '✅' : '❌'}</p>
+          <p>버튼 활성화: {(!isPending && isFormValid && termsAccepted) ? '✅' : '❌'}</p>
+          <details className="mt-2">
+            <summary className="cursor-pointer">폼 에러 상세</summary>
+            <pre className="text-xs mt-1">{JSON.stringify(formErrors, null, 2)}</pre>
+          </details>
+          <details className="mt-2">
+            <summary className="cursor-pointer">폼 값</summary>
+            <pre className="text-xs mt-1">{JSON.stringify(formValues, null, 2)}</pre>
+          </details>
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
@@ -191,8 +212,15 @@ export const SignUpForm = () => {
                 <FormItem>
                   <FormLabel>생년월일</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input 
+                      type="date" 
+                      {...field} 
+                      placeholder="YYYY-MM-DD"
+                    />
                   </FormControl>
+                  <FormDescription>
+                    예: 1990-01-15 (올바른 날짜 형식으로 입력해주세요)
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -260,7 +288,7 @@ export const SignUpForm = () => {
             <Button
               type="submit"
               className="w-full"
-              disabled={isPending || !isFormValid || !termsAccepted}
+              disabled={isPending} // 일단 pending만 체크
             >
               {isPending ? "가입 중..." : "회원가입"}
             </Button>

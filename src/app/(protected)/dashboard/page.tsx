@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
 import { useInfluencerProfileStatus } from "@/features/influencer/hooks/useInfluencerProfileStatus";
+import { useAdvertiserProfileStatus } from "@/features/advertiser/hooks/useAdvertiserProfileStatus";
 import { Button } from "@/components/ui/button";
 
 type DashboardPageProps = {
@@ -13,7 +14,8 @@ type DashboardPageProps = {
 export default function DashboardPage({ params }: DashboardPageProps) {
   void params;
   const { user } = useCurrentUser();
-  const { data: profileStatus } = useInfluencerProfileStatus();
+  const { data: influencerStatus } = useInfluencerProfileStatus();
+  const { data: advertiserStatus } = useAdvertiserProfileStatus();
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-12">
@@ -24,11 +26,20 @@ export default function DashboardPage({ params }: DashboardPageProps) {
             {user?.email ?? "알 수 없는 사용자"} 님, 환영합니다.
           </p>
         </div>
-        {profileStatus?.isInfluencer && !profileStatus?.hasProfile && (
-          <Button asChild>
-            <Link href="/onboarding/influencer">인플루언서 정보 등록</Link>
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {/* 인플루언서 정보 등록 버튼 */}
+          {influencerStatus?.isInfluencer && !influencerStatus?.hasProfile && (
+            <Button asChild>
+              <Link href="/onboarding/influencer">인플루언서 정보 등록</Link>
+            </Button>
+          )}
+          {/* 광고주 정보 등록 버튼 */}
+          {advertiserStatus?.isAdvertiser && !advertiserStatus?.hasProfile && (
+            <Button asChild variant="default">
+              <Link href="/onboarding/advertiser">광고주 정보 등록</Link>
+            </Button>
+          )}
+        </div>
       </header>
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <Image

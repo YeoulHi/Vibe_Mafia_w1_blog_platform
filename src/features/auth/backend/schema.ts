@@ -14,9 +14,9 @@ export const SignUpSchema = z.object({
     .regex(/^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/, {
       message: '유효한 휴대폰 번호를 입력해주세요. (예: 010-1234-5678)',
     }),
-  birthdate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
+  birthdate: z.string().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
     message: '생년월일은 YYYY-MM-DD 형식이어야 합니다.',
-  }),
+  })),
   role: z.enum(['advertiser', 'influencer'], {
     required_error: '역할을 선택해주세요.',
     invalid_type_error: '역할은 광고주 또는 인플루언서여야 합니다.',
