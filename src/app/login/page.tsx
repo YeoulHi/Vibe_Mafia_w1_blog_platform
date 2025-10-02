@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
+import { apiClient } from "@/lib/remote/api-client";
 
 type LoginPageProps = {
   params: Promise<Record<string, never>>;
@@ -54,7 +55,29 @@ export default function LoginPage({ params }: LoginPageProps) {
 
         if (nextAction === "success") {
           await refresh();
-          const redirectedFrom = searchParams.get("redirectedFrom") ?? "/";
+
+          // 인플루언서 프로필 상태 확인
+          try {
+            const statusResponse = await apiClient.get<{
+              isInfluencer: boolean;
+              hasProfile: boolean;
+              needsOnboarding: boolean;
+            }>("/influencer/profile/status");
+
+            const { isInfluencer, needsOnboarding } = statusResponse.data;
+
+            if (isInfluencer && needsOnboarding) {
+              // 인플루언서이고 프로필이 없으면 온보딩 페이지로
+              router.replace("/onboarding/influencer");
+              return;
+            }
+          } catch (error) {
+            // 상태 확인 실패 시 기본 동작 수행
+            console.error("Failed to check influencer status:", error);
+          }
+
+          // 기본 리다이렉트
+          const redirectedFrom = searchParams.get("redirectedFrom") ?? "/dashboard";
           router.replace(redirectedFrom);
         } else {
           setErrorMessage(nextAction);

@@ -38,7 +38,7 @@ flowchart TD
 
 ### 1. Backend (`src/features/influencer/backend`)
 
-- **`schema.ts`**: `channels` 배열(`channel_type`, `channel_url`)에 대한 Zod 스키마를 정의합니다.
+- **`schema.ts`**: `channels` 배열(`channel_type`, `channel_name`, `channel_url`, `follower_count`)에 대한 Zod 스키마를 정의합니다.
 - **`service.ts`**: `updateInfluencerProfile` 서비스를 구현합니다. 로그인된 사용자의 `user_id`를 기반으로 `influencer_profiles`에 레코드를 생성하고, `influencer_channels`에 채널 목록을 저장합니다.
 - **`route.ts`**: `registerInfluencerRoutes`를 생성하고 `POST /api/influencer/profile` 라우트를 정의합니다. 이 라우트는 `withSupabase` 미들웨어를 통해 인증된 사용자만 접근 가능해야 합니다.
 - **`src/backend/hono/app.ts`**: `registerInfluencerRoutes`를 호출하도록 수정합니다.
@@ -53,7 +53,7 @@ flowchart TD
 ### 2. Frontend
 
 - **`InfluencerOnboardingForm.tsx`**: `react-hook-form`의 `useFieldArray`를 사용하여 SNS 채널을 동적으로 추가/삭제하는 UI를 구현합니다. `shadcn-ui`의 `<Input>`, `<Button>`, `<Select>`를 사용합니다.
-- **`useUpdateInfluencerProfile.ts`**: 프로필 정보를 받아 `/api/influencer/profile`로 POST 요청을 보내는 `useMutation` 훅을 생성합니다. 성공 시 대시보드 페이지로 리디렉션합니다.
+- **`useUpdateInfluencerProfile.ts`**: 프로필 정보를 받아 `/api/influencer/profile`로 POST 요청을 보내는 `useMutation` 훅을 생성합니다. 성공 시 성공 토스트를 보여주고 대시보드 페이지로 리디렉션하며, 실패 시 에러 토스트를 표시합니다.
 - **`page.tsx`**: 신규 경로 `src/app/(protected)/onboarding/influencer/page.tsx`를 생성합니다. 이 페이지는 `InfluencerOnboardingForm`을 렌더링하고, 접근 제어는 `(protected)` 레이아웃을 통해 처리됩니다.
 
 #### QA Sheet (Presentation)

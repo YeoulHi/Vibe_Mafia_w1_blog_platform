@@ -1,7 +1,10 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
+import { useInfluencerProfileStatus } from "@/features/influencer/hooks/useInfluencerProfileStatus";
+import { Button } from "@/components/ui/button";
 
 type DashboardPageProps = {
   params: Promise<Record<string, never>>;
@@ -10,14 +13,22 @@ type DashboardPageProps = {
 export default function DashboardPage({ params }: DashboardPageProps) {
   void params;
   const { user } = useCurrentUser();
+  const { data: profileStatus } = useInfluencerProfileStatus();
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-12">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold">대시보드</h1>
-        <p className="text-slate-500">
-          {user?.email ?? "알 수 없는 사용자"} 님, 환영합니다.
-        </p>
+      <header className="flex items-start justify-between">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold">대시보드</h1>
+          <p className="text-slate-500">
+            {user?.email ?? "알 수 없는 사용자"} 님, 환영합니다.
+          </p>
+        </div>
+        {profileStatus?.isInfluencer && !profileStatus?.hasProfile && (
+          <Button asChild>
+            <Link href="/onboarding/influencer">인플루언서 정보 등록</Link>
+          </Button>
+        )}
       </header>
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <Image

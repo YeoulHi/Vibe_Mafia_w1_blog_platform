@@ -12,7 +12,10 @@
       "Bash(timeout 15 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 1; done')",
       "Bash(python:*)",
       "Bash(taskkill:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsc:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
