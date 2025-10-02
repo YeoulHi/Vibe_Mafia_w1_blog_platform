@@ -1,15 +1,15 @@
-# 인플루언서 정보 등록 기능 모듈화 설계
+# 인플루언서 정보 등록 기능 모듈화 설계 (MVP)
 
 ## 1. 개요
 
-회원가입 후 인플루언서 역할의 사용자가 자신의 프로필(생년월일) 및 SNS 채널 정보를 등록하는 기능입니다. `AGENTS.md` 가이드라인에 따라, 전용 페이지와 백엔드 API를 구현하여 정보를 저장합니다. 동적 폼 처리를 위해 `react-hook-form`의 `useFieldArray`를 사용합니다.
+회원가입 후 인플루언서 역할의 사용자가 자신의 SNS 채널 정보를 등록하는 기능입니다. `AGENTS.md` 가이드라인에 따라, 전용 페이지와 백엔드 API를 구현하여 정보를 저장합니다. 동적 폼 처리를 위해 `react-hook-form`의 `useFieldArray`를 사용합니다.
 
 | 모듈 이름 | 위치 | 설명 |
 | --- | --- | --- |
-| `InfluencerOnboardingForm.tsx` | `src/features/influencer/components/` | 생년월일 및 SNS 채널(동적 추가/삭제)을 입력받는 폼 UI. |
+| `InfluencerOnboardingForm.tsx` | `src/features/influencer/components/` | SNS 채널(동적 추가/삭제)을 입력받는 폼 UI. |
 | `useUpdateInfluencerProfile.ts` | `src/features/influencer/hooks/` | 인플루언서 프로필 정보를 백엔드에 제출하는 React Query `useMutation` 훅. |
 | `page.tsx` | `src/app/(protected)/onboarding/influencer/` | `InfluencerOnboardingForm`을 렌더링하는 온보딩 페이지. |
-| `schema.ts` | `src/features/influencer/backend/` | 프로필 및 채널 정보 유효성을 검증하는 Zod 스키마. |
+| `schema.ts` | `src/features/influencer/backend/` | 채널 정보 유효성을 검증하는 Zod 스키마. |
 | `service.ts` | `src/features/influencer/backend/` | `influencer_profiles`와 `influencer_channels` 테이블에 데이터를 저장하는 서비스. |
 | `route.ts` | `src/features/influencer/backend/` | `POST /api/influencer/profile` 엔드포인트를 정의하는 Hono 라우터. |
 
@@ -38,7 +38,7 @@ flowchart TD
 
 ### 1. Backend (`src/features/influencer/backend`)
 
-- **`schema.ts`**: `birthdate`와 `channels` 배열(`channel_type`, `channel_url`)에 대한 Zod 스키마를 정의합니다.
+- **`schema.ts`**: `channels` 배열(`channel_type`, `channel_url`)에 대한 Zod 스키마를 정의합니다.
 - **`service.ts`**: `updateInfluencerProfile` 서비스를 구현합니다. 로그인된 사용자의 `user_id`를 기반으로 `influencer_profiles`에 레코드를 생성하고, `influencer_channels`에 채널 목록을 저장합니다.
 - **`route.ts`**: `registerInfluencerRoutes`를 생성하고 `POST /api/influencer/profile` 라우트를 정의합니다. 이 라우트는 `withSupabase` 미들웨어를 통해 인증된 사용자만 접근 가능해야 합니다.
 - **`src/backend/hono/app.ts`**: `registerInfluencerRoutes`를 호출하도록 수정합니다.
@@ -59,7 +59,6 @@ flowchart TD
 #### QA Sheet (Presentation)
 
 - **`InfluencerOnboardingForm.tsx`**
-    - `[ ]` 생년월일 입력 필드가 렌더링되는가?
     - `[ ]` '채널 추가' 버튼 클릭 시 새로운 SNS 채널 입력 필드(타입 선택, URL 입력) 한 쌍이 나타나는가?
     - `[ ]` '삭제' 버튼 클릭 시 해당 채널 입력 필드가 사라지는가?
     - `[ ]` 유효하지 않은 URL 입력 시 실시간으로 에러 메시지가 표시되는가?

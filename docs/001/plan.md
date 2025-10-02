@@ -1,20 +1,23 @@
-# 회원가입 기능 모듈화 설계
+# 회원가입 기능 모듈화 설계 (재작성)
 
 ## 1. 개요
 
-기존의 프론트엔드 중심 Supabase 직접 호출 방식의 회원가입 로직을 `AGENTS.md` 가이드라인에 따라 백엔드 API를 사용하는 방식으로 리팩터링합니다. 이를 통해 역할(Role) 선택 기능을 추가하고, Auth 유저 생성과 DB 프로필 생성을 하나의 트랜잭션으로 묶어 데이터 정합성을 보장합니다.
+`goal.md`의 요구사항에 따라, 회원가입 프로세스를 **1) 핵심 사용자 정보 등록**과 **2) 역할별 프로필 완성**의 두 단계로 분리하여 설계합니다. 본 문서는 이 중 첫 번째 단계인 **핵심 사용자 정보 등록** 기능의 구현 계획을 다룹니다.
+
+`AGENTS.md` 가이드라인에 따라 백엔드 API를 통해 `auth.users`와 `public.users` 테이블에 사용자의 공통 정보를 생성하고, 데이터 정합성을 보장하기 위한 롤백 로직을 포함합니다.
 
 | 모듈 이름 | 위치 | 설명 |
 | --- | --- | --- |
-| `SignUpForm.tsx` | `src/features/auth/components/` | `react-hook-form`과 `shadcn-ui`를 사용한 회원가입 폼 UI 컴포넌트. |
-| `useSignUpMutation.ts` | `src/features/auth/hooks/` | 회원가입 API를 호출하는 React Query `useMutation` 훅. |
-| `signup/page.tsx` | `src/app/signup/` | `SignUpForm` 컴포넌트를 렌더링하는 페이지. (단순화) |
-| `schema.ts` | `src/features/auth/backend/` | `email`, `password`, `role`을 검증하는 Zod 스키마. |
-| `service.ts` | `src/features/auth/backend/` | Supabase Auth 유저 생성 및 `public.users` 프로필 생성을 처리하는 서비스. |
+| `SignUpForm.tsx` | `src/features/auth/components/` | 공통 정보(이름, 이메일, 연락처, 생년월일, 역할 등) 입력을 위한 UI 컴포넌트. |
+| `useSignUpMutation.ts` | `src/features/auth/hooks/` | 회원가입 API(`POST /api/auth/signup`)를 호출하는 React Query `useMutation` 훅. |
+| `signup/page.tsx` | `src/app/signup/` | `SignUpForm` 컴포넌트를 렌더링하는 페이지. |
+| `schema.ts` | `src/features/auth/backend/` | **`name`, `email`, `phone`, `birthdate`, `role`** 등 공통 정보를 검증하는 Zod 스키마. |
+| `service.ts` | `src/features/auth/backend/` | Supabase Auth 유저 생성 및 `public.users` 프로필 생성을 처리하고, 실패 시 롤백을 수행하는 서비스. |
 | `route.ts` | `src/features/auth/backend/` | `/api/auth/signup` 엔드포인트를 정의하는 Hono 라우터. |
-| `app.ts` | `src/backend/hono/` | 신규 `registerAuthRoutes`를 등록하도록 수정. |
 
 ## 2. Diagram
+
+*아래 다이어그램은 이 문서에서 다루는 '핵심 사용자 정보 등록' 단계의 흐름을 나타냅니다.*
 
 ```mermaid
 flowchart TD
@@ -39,54 +42,40 @@ flowchart TD
 
 ### 1. Backend (`src/features/auth/backend`)
 
-- **`schema.ts`**
-    - `SignUpSchema`를 `zod`를 이용해 정의합니다. (`email`, `password`, `role` 포함).
-- **`service.ts`**
-    - `signUp` 서비스를 구현합니다.
-    - `supabase.auth.admin.createUser`를 호출하여 Auth 유저를 생성합니다.
-    - 성공 시, 반환된 `auth_id`와 `role`을 `public.users` 테이블에 저장합니다.
-    - 두 단계의 생성 과정을 트랜잭션처럼 관리하고 오류 발생 시 롤백 또는 정리 로직을 포함합니다.
-- **`route.ts`**
-    - `registerAuthRoutes` 함수를 생성하고 `POST /auth/signup` 라우트를 정의합니다.
-    - `SignUpSchema`로 요청 body를 검증합니다.
-    - `signUp` 서비스를 호출하고 결과를 `respond` 헬퍼로 반환합니다.
-- **`src/backend/hono/app.ts` 수정**
-    - `registerAuthRoutes(app);`를 추가하여 Hono 앱에 라우트를 등록합니다.
-
-#### Unit Tests (Business Logic)
-
-- **`auth/service.ts`**
-    - `[ ]` 성공적인 요청 시 `auth.users`와 `public.users`에 데이터가 정상적으로 생성되어야 함.
-    - `[ ]` `public.users` 생성 실패 시 `auth.users` 생성을 롤백 처리해야 함.
-    - `[ ]` Supabase 클라이언트에서 에러 발생 시 적절한 에러를 반환해야 함.
-- **`auth/route.ts`**
-    - `[ ]` 유효하지 않은 `email` 형식의 요청에 대해 400 에러를 반환해야 함.
-    - `[ ]` `role` 필드가 누락된 요청에 대해 400 에러를 반환해야 함.
-    - `[ ]` 이미 존재하는 이메일로 요청 시 409 에러를 반환해야 함.
-    - `[ ]` 성공적인 요청에 대해 201 상태 코드와 생성된 유저 정보를 반환해야 함.
+-   **`schema.ts`**
+    -   `SignUpSchema`에 `goal.md`와 DB 스키마 기반의 모든 공통 필수 필드(`email`, `password`, `role`, `name`, `phone`, `birthdate`)를 포함하여 정의합니다.
+-   **`service.ts`**
+    -   `signUp` 서비스는 `SignUpSchema` 타입의 전체 데이터를 인자로 받습니다.
+    -   `supabase.auth.admin.createUser`를 호출하여 Auth 유저를 생성합니다.
+    -   성공 시, `public.users` 테이블에 `auth_id`와 모든 공통 정보를 저장합니다.
+    -   `public.users` 저장 실패 시, 생성했던 Auth 유저를 `deleteUser`로 삭제하는 **보상 트랜잭션 로직을 반드시 구현**합니다.
+-   **`route.ts`**
+    -   `POST /auth/signup` 라우트는 `SignUpSchema`로 요청 body를 검증합니다.
+    -   `signUp` 서비스 호출 후 성공/실패 결과를 `respond` 헬퍼로 반환합니다. (이메일 중복 시 409, 서버 오류 시 500)
 
 ### 2. Frontend (`src/features/auth`, `src/app/signup`)
 
-- **`SignUpForm.tsx` 신규 생성**
-    - `react-hook-form`의 `useForm`과 `zodResolver`를 사용하여 `SignUpSchema`와 연동합니다.
-    - `shadcn-ui`의 `<Input>`, `<Button>`, `<RadioGroup>`을 사용하여 폼을 구성합니다.
-    - `onSubmit` 시 `useSignUpMutation`을 호출합니다.
-- **`useSignUpMutation.ts` 신규 생성**
-    - `@tanstack/react-query`의 `useMutation`을 사용합니다.
-    - mutation 함수는 `@/lib/remote/api-client`를 통해 `POST /api/auth/signup`을 호출합니다.
-    - `onSuccess` 시 "인증 이메일을 확인해주세요" 토스트를 표시하고 로그인 페이지로 리디렉션합니다.
-    - `onError` 시 에러 메시지를 토스트로 표시합니다.
-- **`signup/page.tsx` 리팩터링**
-    - 기존의 복잡한 `useState` 및 `handleSubmit` 로직을 모두 제거합니다.
-    - 페이지의 주된 역할은 `SignUpForm` 컴포넌트를 렌더링하는 것이 됩니다.
+-   **`SignUpForm.tsx`**
+    -   `react-hook-form`과 `zodResolver`를 사용합니다.
+    -   클라이언트 전용 Zod 스키마를 사용하여 `passwordConfirm` (비밀번호 일치) 및 `termsAccepted` (약관 동의)를 검증합니다.
+    -   `Input` (이름, 이메일, 연락처, 생년월일, 비밀번호), `RadioGroup` (역할), `Checkbox` (약관) 필드를 모두 구성합니다.
+-   **`useSignUpMutation.ts`**
+    -   `api-client`로 API 요청 시, `passwordConfirm`과 `termsAccepted` 필드는 **제외하고** 백엔드 `SignUpSchema`에 맞는 데이터만 전송합니다.
+    -   `onSuccess` 시 "인증 이메일을 확인해주세요" 토스트를 표시하고 **로그인 페이지로 리디렉션**합니다.
+    -   `onError` 시 API가 반환한 에러 메시지를 토스트로 표시합니다.
 
-#### QA Sheet (Presentation)
+### 3. QA Sheet (Presentation)
 
-- **`SignUpForm.tsx`**
-    - `[ ]` 이메일, 비밀번호, 비밀번호 확인, 역할 선택(`광고주`/`인플루언서`) 필드가 모두 렌더링되는가?
-    - `[ ]` 유효하지 않은 이메일 입력 시 실시간으로 에러 메시지가 표시되는가?
-    - `[ ]` 비밀번호와 비밀번호 확인이 일치하지 않을 때 에러 메시지가 표시되는가?
-    - `[ ]` 필수 필드를 모두 채우기 전까지 '회원가입' 버튼이 비활성화 상태인가?
-    - `[ ]` 제출(submitting) 중일 때 버튼이 '등록 중...'으로 바뀌고 비활성화되는가?
-    - `[ ]` 회원가입 성공 시 "인증 이메일을 확인해주세요" 메시지가 표시되는가?
-    - `[ ]` 이미 가입된 이메일일 경우, API로부터 받은 에러 메시지("이미 가입된 이메일입니다.")가 표시되는가?
+-   `[ ]` 이름, 이메일, 연락처, 생년월일, 비밀번호, 비밀번호 확인, 역할 선택, 약관 동의 필드가 모두 렌더링되는가?
+-   `[ ]` 필수 필드를 모두 채우고 약관에 동의하기 전까지 '회원가입' 버튼이 비활성화 상태인가?
+-   `[ ]` 연락처, 생년월일 형식이 올바르지 않을 때 실시간 에러 메시지가 표시되는가?
+-   `[ ]` 회원가입 성공 시 "인증 이메일을 확인해주세요" 메시지가 표시되고 로그인 페이지로 이동하는가?
+-   `[ ]` 이미 가입된 이메일일 경우, API로부터 받은 에러 메시지("이미 가입된 이메일입니다.")가 표시되는가?
+
+## 4. 후속 단계: 역할별 프로필 완성
+
+본 계획에 따라 회원가입이 완료된 사용자가 로그인하면, **별도의 프로필 완성 로직**이 실행되어야 합니다.
+
+-   **트리거**: 사용자가 로그인했을 때, 전역 상태 또는 `useCurrentUser` 훅 등을 통해 `users` 정보와 `advertiser_profiles` 또는 `influencer_profiles` 정보을 함께 조회합니다.
+-   **로직**: 만약 `role`은 있으나 역할별 프로필 정보가 없다면, 프로필 완성 페이지 (`/profile/complete-advertiser` 또는 `/profile/complete-influencer`)로 강제 리디렉션합니다.
+-   이 로직은 `(protected)` 그룹의 최상위 `layout.tsx`나 공통 `Provider` 컴포넌트에서 처리하는 것을 권장합니다.

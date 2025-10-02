@@ -1,7 +1,23 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run build:*)",
+      "Bash(cat:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(rm:*)",
+      "Bash(timeout 10 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 1; done')",
+      "Bash(npx next:*)",
+      "Bash(timeout 15 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 1; done')",
+      "Bash(python:*)",
+      "Bash(taskkill:*)",
+      "Bash(git add:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "chrome-devtools",
     "sequential-thinking"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
